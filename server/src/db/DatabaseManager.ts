@@ -42,7 +42,7 @@ export class DatabaseManager {
       ),
     });
 
-    this.pool.on('error', (err) => {
+    this.pool.on('error', (err: Error) => {
       console.error('Unexpected PostgreSQL error:', err);
     });
 

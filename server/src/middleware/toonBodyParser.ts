@@ -33,7 +33,7 @@ export function toonBodyParser(req: Request, res: Response, next: NextFunction):
     next();
   });
 
-  req.on('error', (err) => {
+  req.on('error', (err: Error) => {
     console.error('Body parse error:', err);
     res
       .status(400)
