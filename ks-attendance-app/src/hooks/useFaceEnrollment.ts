@@ -77,13 +77,13 @@ function delay(ms: number) {
 }
 
 const detectorModule = faceDetector;
+
+// Use numeric constants to avoid undefined enum bridging issues on iOS
 const DETECTOR_OPTIONS = detectorModule
   ? {
-      mode: detectorModule.FaceDetectorMode.accurate,
-      detectLandmarks: detectorModule.FaceDetectorLandmarks.none,
-      runClassifications: detectorModule.FaceDetectorClassifications.none,
-      tracking: true,
-      minDetectionInterval: 150,
+      mode: 1, // accurate
+      detectLandmarks: 1, // none
+      runClassifications: 1, // none
     }
   : null;
 
@@ -394,10 +394,20 @@ export function useFaceEnrollment(): UseFaceEnrollmentReturn {
         quality: 0.45,
         skipProcessing: true,
         base64: false,
-        exif: true,
       });
 
-      const detection = await detectorModule?.detectFacesAsync(photo.uri, DETECTOR_OPTIONS || undefined);
+      if (!photo || !photo.uri) {
+        console.warn('[FaceEnrollment] Camera returned invalid photo payload');
+        return;
+      }
+
+      if (!detectorModule || !DETECTOR_OPTIONS) {
+        setGuidance('Face detector unavailable');
+        setDetail('Install expo-face-detector development build.');
+        return;
+      }
+
+      const detection = await detectorModule.detectFacesAsync(photo.uri, DETECTOR_OPTIONS);
       if (!detection) {
         setGuidance('Face detector unavailable');
         setDetail('Restart with expo-face-detector bundled.');
