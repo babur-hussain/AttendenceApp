@@ -312,8 +312,12 @@ export const MultiShotCapture: React.FC = () => {
           quality: 0.35,
           base64: false,
           skipProcessing: true,
-          exif: false,
         });
+
+        if (!photo || !photo.uri) {
+          console.warn('⚠️ Photo capture returned null/invalid');
+          return;
+        }
 
         const detection = await detectorModule.detectFacesAsync(photo.uri, DETECTOR_OPTIONS);
 
