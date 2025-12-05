@@ -36,9 +36,9 @@ const DETECTION_POLL_INTERVAL = 350;
 const detectorModule = faceDetector;
 const DETECTOR_OPTIONS = detectorModule
   ? {
-      mode: detectorModule.FaceDetectorMode.accurate,
-      detectLandmarks: detectorModule.FaceDetectorLandmarks.none,
-      runClassifications: detectorModule.FaceDetectorClassifications.none,
+      mode: detectorModule.FaceDetectorMode?.accurate ?? 1,
+      detectLandmarks: detectorModule.FaceDetectorLandmarks?.none ?? 1,
+      runClassifications: detectorModule.FaceDetectorClassifications?.none ?? 1,
       tracking: true,
       minDetectionInterval: 150,
     }
@@ -316,6 +316,12 @@ export const MultiShotCapture: React.FC = () => {
 
         if (!photo || !photo.uri) {
           console.warn('⚠️ Photo capture returned null/invalid');
+          return;
+        }
+
+        if (!detectorModule || !DETECTOR_OPTIONS) {
+          console.error('❌ Face detector not available');
+          setError('Face detector is not initialized');
           return;
         }
 
