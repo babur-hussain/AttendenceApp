@@ -1,0 +1,24 @@
+{
+  "name": "ks-attendance-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "KS Attendance System - Workspace root",
+  "scripts": {
+    "start:app": "cd ks-attendance-app && npm start",
+    "start:server": "cd server && npm start",
+    "start:dashboard": "cd admin-dashboard && npm run dev",
+    "dev:server": "cd server && npm run dev",
+    "build:server": "cd server && npm run build",
+    "build:dashboard": "cd admin-dashboard && npm run build",
+    "install:all": "npm install && cd ks-attendance-app && npm install && cd ../server && npm install && cd ../admin-dashboard && npm install"
+  },
+  "workspaces": [
+    "ks-attendance-app",
+    "server",
+    "admin-dashboard"
+  ],
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2"
+  }
+}

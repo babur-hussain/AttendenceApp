@@ -1,0 +1,1 @@
+61,63 s|db.getConnection()\n      .prepare('DELETE FROM rate_limits WHERE window_start < ?')\n      .run(windowStart.toISOString());|await db.run('DELETE FROM rate_limits WHERE window_start < ?', [windowStart.toISOString()]);|

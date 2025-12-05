@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.log
+.env
+.DS_Store
+data/*.db
+data/*.db-shm
+data/*.db-wal
+reports/*.xlsx
+reports/*.csv

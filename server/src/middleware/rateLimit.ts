@@ -1,0 +1,139 @@
+/**
+ * Rate Limiting Middleware
+ * Prevents replay attacks and excessive requests
+ * Responds with TOON backoff tokens when limit exceeded
+ */
+
+import { Request, Response, NextFunction } from 'express';
+import { DatabaseManager } from '../db/DatabaseManager';
+import { ToonResponseBuilder } from '../utils/ToonCodec';
+
+const db = DatabaseManager.getInstance();
+
+// Rate limit configuration
+const RATE_LIMITS = {
+  '/api/devices/events': {
+    windowMs: 60000, // 1 minute
+    maxRequests: 100, // 100 events per minute per device
+  },
+  '/api/devices/register': {
+    windowMs: 3600000, // 1 hour
+    maxRequests: 10, // 10 registrations per hour per device
+  },
+  '/api/reports/attendance': {
+    windowMs: 300000, // 5 minutes
+    maxRequests: 5, // 5 reports per 5 minutes
+  },
+};
+
+/**
+ * Rate limiting middleware
+ */
+export async function checkRateLimit(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const endpoint = req.path;
+    const config = RATE_LIMITS[endpoint as keyof typeof RATE_LIMITS];
+
+    if (!config) {
+      // No rate limit for this endpoint
+      return next();
+    }
+
+    // Extract device ID from TOON payload or IP address
+    let deviceId = req.ip || 'unknown';
+    
+    // Try to extract D1 from request body if available
+    if (req.body && typeof req.body === 'string') {
+      const match = req.body.match(/D1:([^|]+)/);
+      if (match) {
+        deviceId = match[1];
+      }
+    }
+
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - config.windowMs);
+
+    // Clean up old entries
+    await db.run('DELETE FROM rate_limits WHERE window_start < ?', [windowStart.toISOString()]);
+
+    // Get current count
+    const currentRecord = await db.get<{ request_count: number }>(
+      'SELECT request_count FROM rate_limits WHERE device_id = ? AND endpoint = ? AND window_start >= ?',
+      [deviceId, endpoint, windowStart.toISOString()]
+    );
+
+    if (currentRecord && currentRecord.request_count >= config.maxRequests) {
+      // Rate limit exceeded
+      const retryAfterMs = config.windowMs - (now.getTime() - new Date(windowStart).getTime());
+      const retryAfterSeconds = Math.ceil(retryAfterMs / 1000);
+
+      const responseToon = ToonResponseBuilder.error({
+        ERR1: 'rate_limit_exceeded',
+        RETRY: retryAfterSeconds.toString(),
+        LIMIT: config.maxRequests.toString(),
+        WINDOW: (config.windowMs / 1000).toString(),
+      });
+
+      res
+        .status(429)
+        .set('Content-Type', 'text/plain')
+        .set('Retry-After', retryAfterSeconds.toString())
+        .set('X-RateLimit-Limit', config.maxRequests.toString())
+        .set('X-RateLimit-Remaining', '0')
+        .set('X-RateLimit-Reset', new Date(now.getTime() + retryAfterMs).toISOString())
+        .send(responseToon);
+
+      return;
+    }
+
+    // Update or insert rate limit record
+    if (currentRecord) {
+      await db.run(
+        `
+        UPDATE rate_limits
+        SET request_count = request_count + 1
+        WHERE device_id = ? AND endpoint = ? AND window_start >= ?
+      `,
+        [deviceId, endpoint, windowStart.toISOString()]
+      );
+    } else {
+      await db.run(
+        'INSERT INTO rate_limits (device_id, endpoint, request_count, window_start) VALUES (?, ?, 1, ?)',
+        [deviceId, endpoint, now.toISOString()]
+      );
+    }
+
+    // Set rate limit headers
+    const remaining = config.maxRequests - (currentRecord?.request_count || 0) - 1;
+    res.set('X-RateLimit-Limit', config.maxRequests.toString());
+    res.set('X-RateLimit-Remaining', remaining.toString());
+    res.set('X-RateLimit-Reset', new Date(now.getTime() + config.windowMs).toISOString());
+
+    next();
+  } catch (error) {
+    console.error('Rate limit check error:', error);
+    // On error, allow request to proceed (fail open)
+    next();
+  }
+}
+
+/**
+ * Custom rate limiter for specific endpoints
+ */
+export function createRateLimiter(windowMs: number, maxRequests: number) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const tempConfig = RATE_LIMITS['/api/devices/events']; // Use existing key temporarily
+    const originalConfig = { ...tempConfig };
+    
+    RATE_LIMITS['/api/devices/events'] = { windowMs, maxRequests };
+    
+    await checkRateLimit(req, res, () => {
+      RATE_LIMITS['/api/devices/events'] = originalConfig;
+      next();
+    });
+  };
+}

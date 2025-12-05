@@ -1,0 +1,51 @@
+name: Mobile EAS Builds
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS build profile (staging|production)'
+        default: 'staging'
+        required: true
+      platform:
+        description: 'Platform (ios|android|all)'
+        default: 'all'
+        required: true
+  push:
+    branches: [ main ]
+    paths:
+      - 'ks-attendance-app/**'
+      - '.github/workflows/mobile-eas.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ks-attendance-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ks-attendance-app/package-lock.json
+      - name: Install EAS CLI
+        run: npm i -g eas-cli
+      - name: Install deps
+        run: npm ci
+      - name: EAS Build
+        env:
+          EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          SERVER_PUBLIC_KEY_BASE64: ${{ secrets.SERVER_PUBLIC_KEY_BASE64 }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          PROFILE=${{ github.event.inputs.profile || 'staging' }}
+          PLATFORM=${{ github.event.inputs.platform || 'all' }}
+          if [ "$PLATFORM" = "all" ]; then
+            eas build --non-interactive --profile "$PROFILE" --platform ios
+            eas build --non-interactive --profile "$PROFILE" --platform android
+          else
+            eas build --non-interactive --profile "$PROFILE" --platform "$PLATFORM"
+          fi
