@@ -34,13 +34,13 @@ const REGISTRATION_DURATION = 10000; // 10 seconds total registration time
 const DETECTION_POLL_INTERVAL = 350;
 
 const detectorModule = faceDetector;
+
+// Simplified detector options to avoid nil enum issues on iOS
 const DETECTOR_OPTIONS = detectorModule
   ? {
-      mode: detectorModule.FaceDetectorMode?.accurate ?? 1,
-      detectLandmarks: detectorModule.FaceDetectorLandmarks?.none ?? 1,
-      runClassifications: detectorModule.FaceDetectorClassifications?.none ?? 1,
-      tracking: true,
-      minDetectionInterval: 150,
+      mode: 1, // accurate mode
+      detectLandmarks: 1, // none
+      runClassifications: 1, // none
     }
   : null;
 
