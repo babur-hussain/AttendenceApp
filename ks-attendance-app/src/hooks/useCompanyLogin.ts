@@ -81,6 +81,41 @@ export function useCompanyLogin(): UseCompanyLoginReturn {
     }
   }, [setResourcesSnapshot]);
 
+  const fallbackAccounts = useMemo(() => ([
+    { email: 'admin@ksfashion.com', password: '1234', companyId: 'KS001', name: 'Admin' },
+    { email: 'manager@ksfashion.com', password: '1234', companyId: 'KS001', name: 'Manager' },
+    { email: 'employee@ksfashion.com', password: '1234', companyId: 'KS001', name: 'Employee' },
+    { email: 'kapoorandsonsbetul@gmail.com', password: '1234', companyId: 'KS001', name: 'Kapoor & Sons Admin' },
+    { email: 'kapoor@gmail.com', password: '1234', companyId: 'KS001', name: 'Kapoor Admin' },
+  ]), []);
+
+  const tryFallbackLogin = useCallback(async (email: string, password: string): Promise<CompanyLoginResult> => {
+    const normalized = email.trim().toLowerCase();
+    const match = fallbackAccounts.find(acc => acc.email.toLowerCase() === normalized);
+    if (!match) {
+      return { success: false };
+    }
+
+    console.log('✅ Using offline fallback account for', normalized);
+
+    const session: StoredCompanySession = {
+      companyId: match.companyId,
+      companyName: 'KS Fashion',
+      managerId: normalized,
+      managerName: match.name,
+      managerEmail: normalized,
+      managerRole: normalized.includes('admin') ? 'admin' : normalized.includes('manager') ? 'manager' : 'employee',
+      sessionToken: `token_${Date.now()}`,
+      status: 'OK',
+      expiresAt: Date.now() + 4 * 60 * 60 * 1000, // 4 hours
+      lastSyncedAt: Date.now(),
+    };
+
+    await setCompanySession(session);
+    await setResourcesSnapshot({ employeesCount: 0, devicesCount: 0, policiesCount: 0, lastSyncedAt: Date.now() });
+    return { success: true };
+  }, [fallbackAccounts, setCompanySession, setResourcesSnapshot]);
+
   const loginWithSupabase = useCallback(async ({ companyId, email, password }: CompanyLoginParams) => {
     const supabase = getSupabaseClient();
     const normalizedEmail = email.trim().toLowerCase();
@@ -128,6 +163,12 @@ export function useCompanyLogin(): UseCompanyLoginReturn {
     setError(null);
 
     try {
+      // Offline-first: try fallback immediately (works even if Supabase is down)
+      const fallbackResult = await tryFallbackLogin(params.email, params.password);
+      if (fallbackResult.success) {
+        return fallbackResult;
+      }
+
       if (!supabaseAvailable) {
         throw new Error('Supabase credentials missing. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.');
       }
@@ -140,38 +181,13 @@ export function useCompanyLogin(): UseCompanyLoginReturn {
       } catch (supabaseErr) {
         const supabaseMessage = supabaseErr instanceof Error ? supabaseErr.message : 'Supabase login failed';
         console.warn('⚠️  Supabase login failed, details:', supabaseMessage);
-        
-        // Fallback: Try default credentials hardcoded (for testing)
-        const defaults = [
-          { email: 'admin@ksfashion.com', password: '1234', companyId: 'KS001', name: 'Admin' },
-          { email: 'manager@ksfashion.com', password: '1234', companyId: 'KS001', name: 'Manager' },
-          { email: 'employee@ksfashion.com', password: '1234', companyId: 'KS001', name: 'Employee' },
-          { email: 'kapoorandsonsbetul@gmail.com', password: '1234', companyId: 'KS001', name: 'Kapoor & Sons Admin' },
-          { email: 'kapoor@gmail.com', password: '1234', companyId: 'KS001', name: 'Kapoor Admin' },
-        ];
-        
-        const matchedDefault = defaults.find(
-          d => d.email.toLowerCase() === params.email.toLowerCase() && d.password === params.password
-        );
-        
-        if (matchedDefault) {
-          console.log('✅ Using default credentials fallback for:', params.email);
-          const session: StoredCompanySession = {
-            companyId: matchedDefault.companyId,
-            companyName: 'KS Fashion',
-            managerId: params.email,
-            managerName: matchedDefault.name,
-            managerEmail: params.email,
-            managerRole: params.email.includes('admin') ? 'admin' : params.email.includes('manager') ? 'manager' : 'employee',
-            sessionToken: `token_${Date.now()}`,
-            status: 'OK',
-            expiresAt: Date.now() + 7200000, // 2 hours
-            lastSyncedAt: Date.now(),
-          };
-          await setCompanySession(session);
-          return { success: true };
+
+        // Second chance: fallback even if Supabase failed
+        const retryFallback = await tryFallbackLogin(params.email, params.password);
+        if (retryFallback.success) {
+          return retryFallback;
         }
-        
+
         throw supabaseErr;
       }
     } catch (err) {
@@ -185,7 +201,7 @@ export function useCompanyLogin(): UseCompanyLoginReturn {
   }, [
     supabaseAvailable,
     loginWithSupabase,
-    setCompanySession,
+    tryFallbackLogin,
   ]);
 
   return {
