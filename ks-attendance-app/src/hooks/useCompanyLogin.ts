@@ -147,6 +147,7 @@ export function useCompanyLogin(): UseCompanyLoginReturn {
           { email: 'manager@ksfashion.com', password: '1234', companyId: 'KS001', name: 'Manager' },
           { email: 'employee@ksfashion.com', password: '1234', companyId: 'KS001', name: 'Employee' },
           { email: 'kapoorandsonsbetul@gmail.com', password: '1234', companyId: 'KS001', name: 'Kapoor & Sons Admin' },
+          { email: 'kapoor@gmail.com', password: '1234', companyId: 'KS001', name: 'Kapoor Admin' },
         ];
         
         const matchedDefault = defaults.find(
