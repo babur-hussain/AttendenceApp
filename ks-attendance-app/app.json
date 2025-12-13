@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "main": "index.ts",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -52,8 +52,13 @@
         "android.permission.CAMERA",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "package": "com.baburhussain.ksattendanceapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
