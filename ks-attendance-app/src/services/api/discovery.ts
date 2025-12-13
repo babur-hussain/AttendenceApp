@@ -79,13 +79,21 @@ async function getLocalServerUrl(): Promise<string | null> {
 
 /**
  * Discover server automatically
- * 1. Try local network discovery (WiFi)
- * 2. Fall back to production URL
- * 3. Fall back to localhost for simulator
+ * 1. Use live Render URL (works everywhere on mobile data)
+ * 2. For simulators in dev, use localhost/emulator special IP
  */
 export async function discoverServer(): Promise<ServerConfig> {
-  // Check for explicit environment variable first
+  // Production/Release: Always use live Render URL
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl && envUrl.includes('onrender.com')) {
+    console.log(`☁️ Using live Render API URL: ${envUrl}`);
+    return {
+      baseUrl: envUrl,
+      isLocal: false,
+    };
+  }
+
+  // Development with explicit env URL
   if (envUrl) {
     console.log(`📡 Using configured API URL: ${envUrl}`);
     return {
@@ -94,10 +102,10 @@ export async function discoverServer(): Promise<ServerConfig> {
     };
   }
   
-  // Production URL (deploy your server and update this)
-  const productionUrl = process.env.EXPO_PUBLIC_PROD_API_URL || 'https://your-server.com/api';
+  // Production URL fallback
+  const productionUrl = process.env.EXPO_PUBLIC_PROD_API_URL || 'https://attendenceapp-6lf5.onrender.com/api';
   
-  // For iOS Simulator or Android Emulator
+  // For iOS Simulator or Android Emulator only
   if (__DEV__) {
     if (Platform.OS === 'ios') {
       // iOS Simulator uses localhost
@@ -116,19 +124,8 @@ export async function discoverServer(): Promise<ServerConfig> {
     }
   }
   
-  // Try to discover server on local network
-  console.log('🔍 Attempting to discover server on local network...');
-  const localUrl = await getLocalServerUrl();
-  
-  if (localUrl) {
-    return {
-      baseUrl: `${localUrl}/api`,
-      isLocal: true,
-    };
-  }
-  
-  // Fall back to production
-  console.log('☁️ Using production server URL');
+  // Default to production (works on mobile data anywhere)
+  console.log('☁️ Using production Render server URL');
   return {
     baseUrl: productionUrl,
     isLocal: false,
