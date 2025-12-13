@@ -63,20 +63,35 @@ export function AdminSessionProvider({ children }: AdminSessionProviderProps) {
           loadPinSession(),
         ]);
 
+        // If the cached company is from an old build, drop it to avoid invalid PIN sessions
+        const isStaleCompany = storedCompany && storedCompany.companyId !== 'KS001';
+        const sanitizedCompany = isStaleCompany ? null : storedCompany;
+        const sanitizedResources = isStaleCompany ? null : storedResources;
+        const sanitizedPin = isStaleCompany ? null : storedPin;
+
         if (!isMounted) {
           return;
         }
 
         console.log('🚀 AdminSessionProvider: bootstrap complete', {
-          hasCompanySession: !!storedCompany,
-          hasResources: !!storedResources,
-          hasPin: !!storedPin,
+          hasCompanySession: !!sanitizedCompany,
+          hasResources: !!sanitizedResources,
+          hasPin: !!sanitizedPin,
         });
 
-        setCompanySessionState(storedCompany);
-        setResourcesSnapshotState(storedResources);
-        if (storedPin && storedPin.expiresAt > Date.now()) {
-          setPinSessionState(storedPin);
+        setCompanySessionState(sanitizedCompany);
+        setResourcesSnapshotState(sanitizedResources);
+        if (sanitizedPin && sanitizedPin.expiresAt > Date.now()) {
+          setPinSessionState(sanitizedPin);
+        }
+
+        if (isStaleCompany) {
+          console.log('🧹 Cleared stale cached company session');
+          await Promise.all([
+            clearCompanySessionStorage(),
+            clearResourcesSnapshot(),
+            clearPinSessionStorage(),
+          ]);
         }
       } finally {
         if (isMounted) {
